@@ -9,12 +9,11 @@ permissions:
   contents: read
 
 jobs:
-  check-version:
+  publish:
     runs-on: ubuntu-latest
-    outputs:
-      changed: ${{ steps.version.outputs.changed }}
-      version: ${{ steps.version.outputs.version }}
-      dist-tag: ${{ steps.version.outputs.dist-tag }}
+    permissions:
+      contents: write # Required to create the GitHub release
+      id-token: write # Required for npm trusted publishing
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -37,32 +36,21 @@ jobs:
               ;;
           esac
           {
-            echo "changed=$CHANGED"
-            echo "version=$VERSION"
-            echo "dist-tag=$DIST_TAG"
-          } >> "$GITHUB_OUTPUT"
-
-  publish:
-    needs: check-version
-    if: needs.check-version.outputs.changed == 'true'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write # Required to create the GitHub release
-      id-token: write # Required for npm trusted publishing
-    env:
-      VERSION: ${{ needs.check-version.outputs.version }}
-      DIST_TAG: ${{ needs.check-version.outputs.dist-tag }}
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
+            echo "CHANGED=$CHANGED"
+            echo "VERSION=$VERSION"
+            echo "DIST_TAG=$DIST_TAG"
+          } >> "$GITHUB_ENV"
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        if: env.CHANGED == 'true'
         with:
           node-version: "24"
           registry-url: "https://registry.npmjs.org"
-      - run: yarn install --immutable
-      - run: yarn pack
+      - if: env.CHANGED == 'true'
+        run: yarn install --immutable
+      - if: env.CHANGED == 'true'
+        run: yarn pack
       - name: Create GitHub release
+        if: env.CHANGED == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -80,4 +68,5 @@ jobs:
             --title "$TAG" \
             --generate-notes \
             "${PRERELEASE_FLAG[@]}"
-      - run: npm publish package.tgz --tag "$DIST_TAG"
+      - if: env.CHANGED == 'true'
+        run: npm publish package.tgz --tag "$DIST_TAG"
