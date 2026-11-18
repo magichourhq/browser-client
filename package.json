@@ -1,0 +1,31 @@
+{
+  "name": "@magichourhq/browser-client",
+  "version": "0.0.0-dev.1",
+  "description": "Browser client for the Magic Hour API",
+  "type": "module",
+  "license": "MIT",
+  "packageManager": "yarn@4.18.0",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/magichourhq/browser-client.git"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "prepack": "yarn build"
+  },
+  "devDependencies": {
+    "typescript": "7.0.2"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
