@@ -4,6 +4,7 @@
   "description": "Browser client for the Magic Hour API",
   "type": "module",
   "license": "MIT",
+  "packageManager": "yarn@4.18.0",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -19,10 +20,10 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "prepack": "npm run build"
+    "prepack": "yarn build"
   },
   "devDependencies": {
-    "typescript": "^6.0.0"
+    "typescript": "6.0.3"
   },
   "publishConfig": {
     "access": "public"
