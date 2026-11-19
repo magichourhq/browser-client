@@ -10,7 +10,16 @@ export function abortError(signal: AbortSignal): unknown {
 }
 
 /** Replaces `AbortSignal.timeout` and `AbortSignal.any`, which older browsers lack. */
-export function createTimeoutSignal(timeoutMs: number, parent?: AbortSignal): TimeoutSignal {
+/**
+ * `keepAlive: false` lets a Node process exit while the deadline is pending. Only use it for
+ * signals the caller manages; an internal deadline must stay referenced so it can fire and
+ * deliver its error (for example, a project ID while a save callback hangs).
+ */
+export function createTimeoutSignal(
+  timeoutMs: number,
+  parent?: AbortSignal,
+  { keepAlive = true }: { keepAlive?: boolean } = {}
+): TimeoutSignal {
   const controller = new AbortController();
   function abortFromParent() {
     clear();
@@ -26,8 +35,7 @@ export function createTimeoutSignal(timeoutMs: number, parent?: AbortSignal): Ti
     parent?.removeEventListener("abort", abortFromParent);
   }
   const timer = setTimeout(abortFromTimeout, Math.min(timeoutMs, MAX_TIMER_MS));
-  // Like AbortSignal.timeout, the deadline alone must not keep a Node process running.
-  (timer as { unref?: () => void }).unref?.();
+  if (!keepAlive) (timer as { unref?: () => void }).unref?.();
   if (parent?.aborted) abortFromParent();
   else parent?.addEventListener("abort", abortFromParent, { once: true });
   return { signal: controller.signal, clear };

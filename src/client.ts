@@ -63,7 +63,8 @@ export class MagicHourClient {
   }
   /** Shares one deadline across several calls. Its timer runs until it fires or `signal` aborts. */
   signal(signal?: AbortSignal): AbortSignal {
-    return createTimeoutSignal(this.timeoutMs, signal).signal;
+    // The caller owns this signal and may never use it, so it must not keep Node running.
+    return createTimeoutSignal(this.timeoutMs, signal, { keepAlive: false }).signal;
   }
   async create(...[endpoint, body, signal, headers]: CreateArguments): Promise<string> {
     // Without a known kind, the accepted project could not be resumed.
@@ -167,7 +168,8 @@ export class MagicHourClient {
         deadline,
         messages.downloadFailed
       );
-      if (!response.ok)
+      // A 206 is only part of the file; this client never asks for a range.
+      if (!response.ok || response.status === 206)
         throw new Error(
           this.formatMessage(messages.downloadHttpError, { status: response.status })
         );
