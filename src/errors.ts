@@ -8,7 +8,9 @@ export class MagicHourError extends Error {
     readonly status?: number,
     formatMessage: MessageFormatter = englishMessage
   ) {
-    super(projectId ? formatMessage(messages.projectRecovery, { message, projectId }) : message);
+    super(
+      projectId ? formatMessage({ ...messages.projectRecovery }, { message, projectId }) : message
+    );
     this.name = "MagicHourError";
   }
 }

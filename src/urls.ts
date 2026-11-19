@@ -8,6 +8,6 @@ export function httpsURL(value: string, formatMessage: MessageFormatter = englis
     // URL parser errors can repeat the value, which may be a signed URL.
   }
   if (url?.protocol !== "https:" || url.username || url.password)
-    throw new Error(formatMessage(messages.invalidMediaUrl));
+    throw new Error(formatMessage({ ...messages.invalidMediaUrl }));
   return url.href;
 }

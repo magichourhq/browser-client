@@ -33,7 +33,9 @@ export class MagicHourClient {
   readonly timeoutMs: number;
   private readonly formatMessage: MessageFormatter;
   constructor(private readonly settings: ClientSettings) {
-    this.formatMessage = settings.formatMessage ?? englishMessage;
+    const format = settings.formatMessage ?? englishMessage;
+    // Pass a copy so a host formatter cannot change the shared message table.
+    this.formatMessage = (message, values) => format({ ...message }, values);
     if (!settings.apiKey?.trim()) throw new Error(this.formatMessage(messages.apiKeyRequired));
     this.pollIntervalMs = settings.pollIntervalMs ?? 2000;
     this.timeoutMs = settings.timeoutMs ?? 600_000;
