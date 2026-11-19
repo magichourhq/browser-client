@@ -61,7 +61,12 @@ type CreateBodies = {
   "video-to-video": VideoToVideoCreateBody;
 };
 
-/** The project kind each create endpoint makes. */
+/**
+ * The project kind each create endpoint makes.
+ *
+ * TODO: Generate this map and `CreateBodies` in `@magichourhq/api-types`. Each create operation
+ * in the OpenAPI spec has an "Image Projects", "Video Projects" or "Audio Projects" tag.
+ */
 export const createKinds = {
   "ai-clothes-changer": "image",
   "ai-face-editor": "image",
