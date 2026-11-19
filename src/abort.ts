@@ -10,7 +10,16 @@ export function abortError(signal: AbortSignal): unknown {
 }
 
 /** Replaces `AbortSignal.timeout` and `AbortSignal.any`, which older browsers lack. */
-export function createTimeoutSignal(timeoutMs: number, parent?: AbortSignal): TimeoutSignal {
+/**
+ * `keepAlive: false` lets a Node process exit while the deadline is pending. Only use it for
+ * signals the caller manages; an internal deadline must stay referenced so it can fire and
+ * deliver its error (for example, a project ID while a save callback hangs).
+ */
+export function createTimeoutSignal(
+  timeoutMs: number,
+  parent?: AbortSignal,
+  { keepAlive = true }: { keepAlive?: boolean } = {}
+): TimeoutSignal {
   const controller = new AbortController();
   function abortFromParent() {
     clear();
@@ -26,8 +35,7 @@ export function createTimeoutSignal(timeoutMs: number, parent?: AbortSignal): Ti
     parent?.removeEventListener("abort", abortFromParent);
   }
   const timer = setTimeout(abortFromTimeout, Math.min(timeoutMs, MAX_TIMER_MS));
-  // Like AbortSignal.timeout, the deadline alone must not keep a Node process running.
-  (timer as { unref?: () => void }).unref?.();
+  if (!keepAlive) (timer as { unref?: () => void }).unref?.();
   if (parent?.aborted) abortFromParent();
   else parent?.addEventListener("abort", abortFromParent, { once: true });
   return { signal: controller.signal, clear };
@@ -41,5 +49,21 @@ export function abortable<T>(promise: Promise<T>, signal: AbortSignal): Promise<
     if (signal.aborted) abort();
     else signal.addEventListener("abort", abort, { once: true });
     promise.then(resolve, reject).then(() => signal.removeEventListener("abort", abort));
+  });
+}
+
+/** Waits `ms`, or rejects as soon as `signal` aborts. Clears its timer either way. */
+export function sleep(ms: number, signal: AbortSignal): Promise<void> {
+  return new Promise<void>((resolve, reject) => {
+    function abort() {
+      clearTimeout(timer);
+      reject(abortError(signal));
+    }
+    const timer = setTimeout(() => {
+      signal.removeEventListener("abort", abort);
+      resolve();
+    }, ms);
+    if (signal.aborted) abort();
+    else signal.addEventListener("abort", abort, { once: true });
   });
 }
