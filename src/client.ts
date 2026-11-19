@@ -74,7 +74,30 @@ export class MagicHourClient {
     signal?: AbortSignal,
     extraHeaders?: Record<string, string | undefined>
   ): Promise<T> {
-    return this.send<T>(this.prepareRequest(path, body, extraHeaders), signal);
+    const request = this.prepareRequest(path, body, extraHeaders);
+    return body === undefined ? this.send<T>(request, signal) : this.submit<T>(request, signal);
+  }
+  /** Sends a POST that may start paid work, reporting when its outcome is unknown. */
+  private async submit<T>(request: PreparedRequest, signal?: AbortSignal): Promise<T> {
+    return this.withDeadline(signal, async (deadline) => {
+      if (deadline.aborted) throw abortError(deadline);
+      try {
+        return await this.send<T>(request, deadline);
+      } catch (error) {
+        const status = error instanceof MagicHourError ? error.status : undefined;
+        if (wasRejected(status)) throw error;
+        throw new MagicHourError(
+          this.formatMessage({
+            defaultMessage:
+              "Generation submission was interrupted. Acceptance is unknown; check account history before submitting again.",
+            description: "Error shown when a Magic Hour API operation cannot complete.",
+          }),
+          undefined,
+          status,
+          this.formatMessage
+        );
+      }
+    });
   }
   private prepareRequest(
     path: string,
@@ -150,25 +173,8 @@ export class MagicHourClient {
   }
   async create(...[endpoint, kind, body, signal, headers]: CreateArguments): Promise<string> {
     return this.withDeadline(signal, async (deadline) => {
-      if (deadline.aborted) throw abortError(deadline);
       const request = this.prepareRequest(`/v1/${endpoint}`, body, headers);
-      let created: CreatedProject | null;
-      try {
-        created = await this.send<CreatedProject | null>(request, deadline);
-      } catch (error) {
-        const status = error instanceof MagicHourError ? error.status : undefined;
-        if (wasRejected(status)) throw error;
-        throw new MagicHourError(
-          this.formatMessage({
-            defaultMessage:
-              "Generation submission was interrupted. Acceptance is unknown; check account history before submitting again.",
-            description: "Error shown when a Magic Hour API operation cannot complete.",
-          }),
-          undefined,
-          status,
-          this.formatMessage
-        );
-      }
+      const created = await this.submit<CreatedProject | null>(request, deadline);
       const id = created?.id;
       if (typeof id !== "string" || !id)
         throw new MagicHourError(
@@ -319,9 +325,8 @@ export class MagicHourClient {
       );
     return this.withDeadline(signal, async (deadline) => {
       const uploadRequest: FilesUploadUrlsCreateBody = { items: [{ type: "image", extension }] };
-      const uploadUrls = await this.request<FilesUploadUrlsCreateResponse | null>(
-        "/v1/files/upload-urls",
-        uploadRequest,
+      const uploadUrls = await this.send<FilesUploadUrlsCreateResponse | null>(
+        this.prepareRequest("/v1/files/upload-urls", uploadRequest),
         deadline
       );
       const item = uploadUrls?.items?.[0];
@@ -357,6 +362,7 @@ export class MagicHourClient {
     init: RequestInit,
     deadline: AbortSignal
   ): Promise<Response> {
+    if (deadline.aborted) throw abortError(deadline);
     const pending = this.fetcher(url, { ...init, signal: deadline });
     try {
       return await abortable(pending, deadline);
