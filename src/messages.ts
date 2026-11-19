@@ -3,7 +3,11 @@ export type MessageFormatter = (
   message: MessageDescriptor,
   values?: Record<string, string | number>
 ) => string;
-export const englishMessage: MessageFormatter = (message, values = {}) =>
-  message.defaultMessage.replace(/\{(\w+)\}/g, (placeholder, key) =>
+export function englishMessage(
+  message: MessageDescriptor,
+  values: Record<string, string | number> = {}
+): string {
+  return message.defaultMessage.replace(/\{(\w+)\}/g, (placeholder, key) =>
     String(values[key] ?? placeholder)
   );
+}
