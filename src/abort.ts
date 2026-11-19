@@ -10,13 +10,21 @@ const timeoutError = () => new DOMException("The operation timed out.", "Timeout
 export const abortError = (signal: AbortSignal): unknown =>
   signal.reason ?? new DOMException("The operation was aborted.", "AbortError");
 
+function isTimeoutReason(reason: unknown): boolean {
+  try {
+    return (reason as { name?: unknown } | null | undefined)?.name === "TimeoutError";
+  } catch {
+    return false;
+  }
+}
+
 /** Replaces `AbortSignal.timeout` and `AbortSignal.any`, which older browsers lack. */
 export function createTimeoutSignal(timeoutMs: number, parent?: AbortSignal): TimeoutSignal {
   const controller = new AbortController();
   const abortFromParent = () => {
     clear();
     // Caller abort reasons can hold sensitive values, so only the timeout type is kept.
-    controller.abort(parent?.reason?.name === "TimeoutError" ? timeoutError() : undefined);
+    controller.abort(isTimeoutReason(parent?.reason) ? timeoutError() : undefined);
   };
   const timer = setTimeout(
     () => {

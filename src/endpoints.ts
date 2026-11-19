@@ -7,12 +7,15 @@ import type {
   AiImageGeneratorCreateBody,
   AiImageUpscalerCreateBody,
   AiMemeGeneratorCreateBody,
+  AiMusicGeneratorCreateBody,
   AiQrCodeGeneratorCreateBody,
   AiTalkingPhotoCreateBody,
   AiUgcAdCreateBody,
   AiVideoEditorCreateBody,
   AiVideoTranslatorCreateBody,
   AiVideoUpscalerCreateBody,
+  AiVoiceClonerCreateBody,
+  AiVoiceGeneratorCreateBody,
   AnimationCreateBody,
   AudioToVideoCreateBody,
   AutoSubtitleGeneratorCreateBody,
@@ -38,19 +41,22 @@ export type CreateEndpoints = {
   "ai-image-generator": { kind: "image"; body: AiImageGeneratorCreateBody };
   "ai-image-upscaler": { kind: "image"; body: AiImageUpscalerCreateBody };
   "ai-meme-generator": { kind: "image"; body: AiMemeGeneratorCreateBody };
+  "ai-music-generator": { kind: "audio"; body: AiMusicGeneratorCreateBody };
   "ai-qr-code-generator": { kind: "image"; body: AiQrCodeGeneratorCreateBody };
   "ai-talking-photo": { kind: "video"; body: AiTalkingPhotoCreateBody };
   "ai-ugc-ad": { kind: "video"; body: AiUgcAdCreateBody };
   "ai-video-editor": { kind: "video"; body: AiVideoEditorCreateBody };
   "ai-video-translator": { kind: "video"; body: AiVideoTranslatorCreateBody };
   "ai-video-upscaler": { kind: "video"; body: AiVideoUpscalerCreateBody };
+  "ai-voice-cloner": { kind: "audio"; body: AiVoiceClonerCreateBody };
+  "ai-voice-generator": { kind: "audio"; body: AiVoiceGeneratorCreateBody };
   "animation": { kind: "video"; body: AnimationCreateBody };
   "audio-to-video": { kind: "video"; body: AudioToVideoCreateBody };
   "auto-subtitle-generator": { kind: "video"; body: AutoSubtitleGeneratorCreateBody };
   "body-swap": { kind: "image"; body: BodySwapCreateBody };
   "character-replace": { kind: "video"; body: CharacterReplaceCreateBody };
-  "face-swap": { kind: "video"; body: FaceSwapCreateBody };
   "face-swap-photo": { kind: "image"; body: FaceSwapPhotoCreateBody };
+  "face-swap": { kind: "video"; body: FaceSwapCreateBody };
   "head-swap": { kind: "image"; body: HeadSwapCreateBody };
   "image-background-remover": { kind: "image"; body: ImageBackgroundRemoverCreateBody };
   "image-to-video": { kind: "video"; body: ImageToVideoCreateBody };

@@ -12,6 +12,9 @@ import type { Project, ProjectKind } from "./projects.js";
 import { httpsURL } from "./urls.js";
 
 type CreatedProject = Pick<AiImageGeneratorCreateResponse | ImageToVideoCreateResponse, "id">;
+type PreparedRequest = { url: string; init: RequestInit };
+
+const API_ORIGIN = "https://api.magichour.ai";
 
 /** A 4xx means the API refused the job, except 408, where the outcome is unknown. */
 const wasRejected = (status?: number) =>
@@ -71,20 +74,47 @@ export class MagicHourClient {
     signal?: AbortSignal,
     extraHeaders?: Record<string, string | undefined>
   ): Promise<T> {
-    const headers = new Headers();
-    for (const [key, value] of Object.entries(extraHeaders ?? {}))
-      if (value !== undefined) headers.set(key, value);
-    headers.set("Authorization", `Bearer ${this.settings.apiKey.trim()}`);
-    headers.set("Accept", "application/json");
-    if (body !== undefined) headers.set("Content-Type", "application/json");
+    return this.send<T>(this.prepareRequest(path, body, extraHeaders), signal);
+  }
+  private prepareRequest(
+    path: string,
+    body?: unknown,
+    extraHeaders?: Record<string, string | undefined>
+  ): PreparedRequest {
+    try {
+      const url = new URL(path, API_ORIGIN);
+      if (url.origin !== API_ORIGIN) throw new Error("Unexpected API origin.");
+      const headers = new Headers();
+      for (const [key, value] of Object.entries(extraHeaders ?? {}))
+        if (value !== undefined) headers.set(key, value);
+      headers.set("Authorization", `Bearer ${this.settings.apiKey.trim()}`);
+      headers.set("Accept", "application/json");
+      if (body !== undefined) headers.set("Content-Type", "application/json");
+      return {
+        url: url.href,
+        init: {
+          method: body === undefined ? "GET" : "POST",
+          headers,
+          ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
+          redirect: "error",
+        },
+      };
+    } catch {
+      // Parser and header errors can repeat a URL, header value or API key.
+      throw new MagicHourError(
+        this.formatMessage({
+          defaultMessage: "The Magic Hour request is invalid and was not sent.",
+          description: "Error shown when a Magic Hour API operation cannot complete.",
+        }),
+        undefined,
+        undefined,
+        this.formatMessage
+      );
+    }
+  }
+  private async send<T>({ url, init }: PreparedRequest, signal?: AbortSignal): Promise<T> {
     return this.withDeadline(signal, async (deadline) => {
-      const response = await this.fetcher(`https://api.magichour.ai${path}`, {
-        method: body === undefined ? "GET" : "POST",
-        headers,
-        ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
-        signal: deadline,
-        redirect: "error",
-      });
+      const response = await this.fetchWithin(url, init, deadline);
       if (!response.ok) {
         discardBody(response);
         // Do not echo a remote response that could contain credentials or signed URLs.
@@ -102,7 +132,7 @@ export class MagicHourClient {
         );
       }
       try {
-        return (await response.json()) as T;
+        return (await abortable(response.json(), deadline)) as T;
       } catch (error) {
         if (deadline.aborted) throw error;
         // JSON parser errors can quote the response body.
@@ -121,14 +151,10 @@ export class MagicHourClient {
   async create(...[endpoint, kind, body, signal, headers]: CreateArguments): Promise<string> {
     return this.withDeadline(signal, async (deadline) => {
       if (deadline.aborted) throw abortError(deadline);
+      const request = this.prepareRequest(`/v1/${endpoint}`, body, headers);
       let created: CreatedProject | null;
       try {
-        created = await this.request<CreatedProject | null>(
-          `/v1/${endpoint}`,
-          body,
-          deadline,
-          headers
-        );
+        created = await this.send<CreatedProject | null>(request, deadline);
       } catch (error) {
         const status = error instanceof MagicHourError ? error.status : undefined;
         if (wasRejected(status)) throw error;
@@ -263,10 +289,11 @@ export class MagicHourClient {
   }
   async download(url: string, signal?: AbortSignal): Promise<Uint8Array> {
     return this.withDeadline(signal, async (deadline) => {
-      const response = await this.fetcher(httpsURL(url, this.formatMessage), {
-        signal: deadline,
-        credentials: "omit",
-      });
+      const response = await this.fetchWithin(
+        httpsURL(url, this.formatMessage),
+        { credentials: "omit" },
+        deadline
+      );
       if (!response.ok) {
         discardBody(response);
         throw new Error(
@@ -279,7 +306,7 @@ export class MagicHourClient {
           )
         );
       }
-      return new Uint8Array(await response.arrayBuffer());
+      return new Uint8Array(await abortable(response.arrayBuffer(), deadline));
     });
   }
   async uploadImage(bytes: Uint8Array, extension: string, signal?: AbortSignal): Promise<string> {
@@ -305,12 +332,11 @@ export class MagicHourClient {
             description: "Error shown when a Magic Hour API operation cannot complete.",
           })
         );
-      const response = await this.fetcher(httpsURL(item.upload_url, this.formatMessage), {
-        method: "PUT",
-        body: bytes as BodyInit,
-        signal: deadline,
-        credentials: "omit",
-      });
+      const response = await this.fetchWithin(
+        httpsURL(item.upload_url, this.formatMessage),
+        { method: "PUT", body: bytes as BodyInit, credentials: "omit" },
+        deadline
+      );
       discardBody(response);
       if (!response.ok)
         throw new Error(
@@ -324,6 +350,20 @@ export class MagicHourClient {
         );
       return item.file_path;
     });
+  }
+  /** Enforces the deadline even when a custom `fetch` ignores its signal. */
+  private async fetchWithin(
+    url: string,
+    init: RequestInit,
+    deadline: AbortSignal
+  ): Promise<Response> {
+    const pending = this.fetcher(url, { ...init, signal: deadline });
+    try {
+      return await abortable(pending, deadline);
+    } catch (error) {
+      pending.then(discardBody, () => {});
+      throw error;
+    }
   }
   private async withDeadline<T>(
     signal: AbortSignal | undefined,
