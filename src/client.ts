@@ -4,10 +4,10 @@ import type {
   FilesUploadUrlsCreateResponse,
   ImageToVideoCreateResponse,
 } from "@magichourhq/api-types";
-import { abortable, createTimeoutSignal } from "./abort.js";
+import { abortable, abortError, createTimeoutSignal } from "./abort.js";
 import type { CreateArguments } from "./endpoints.js";
 import { MagicHourError } from "./errors.js";
-import { englishMessage, type MessageFormatter } from "./messages.js";
+import { withEnglishFallback, type MessageFormatter } from "./messages.js";
 import type { Project, ProjectKind } from "./projects.js";
 import { httpsURL } from "./urls.js";
 
@@ -16,6 +16,9 @@ type CreatedProject = Pick<AiImageGeneratorCreateResponse | ImageToVideoCreateRe
 /** A 4xx means the API refused the job, except 408, where the outcome is unknown. */
 const wasRejected = (status?: number) =>
   status !== undefined && status >= 400 && status < 500 && status !== 408;
+
+/** Releases a response body the client will not read, so it cannot outlive the deadline. */
+const discardBody = (response: Response) => void response.body?.cancel().catch(() => {});
 
 export type ClientSettings = {
   apiKey: string;
@@ -32,7 +35,7 @@ export class MagicHourClient {
   readonly timeoutMs: number;
   private readonly formatMessage: MessageFormatter;
   constructor(private readonly settings: ClientSettings) {
-    this.formatMessage = settings.formatMessage ?? englishMessage;
+    this.formatMessage = withEnglishFallback(settings.formatMessage);
     if (!settings.apiKey?.trim())
       throw new Error(
         this.formatMessage({
@@ -83,6 +86,7 @@ export class MagicHourClient {
         redirect: "error",
       });
       if (!response.ok) {
+        discardBody(response);
         // Do not echo a remote response that could contain credentials or signed URLs.
         throw new MagicHourError(
           this.formatMessage(
@@ -116,6 +120,7 @@ export class MagicHourClient {
   }
   async create(...[endpoint, kind, body, signal, headers]: CreateArguments): Promise<string> {
     return this.withDeadline(signal, async (deadline) => {
+      if (deadline.aborted) throw abortError(deadline);
       let created: CreatedProject | null;
       try {
         created = await this.request<CreatedProject | null>(
@@ -262,7 +267,8 @@ export class MagicHourClient {
         signal: deadline,
         credentials: "omit",
       });
-      if (!response.ok)
+      if (!response.ok) {
+        discardBody(response);
         throw new Error(
           this.formatMessage(
             {
@@ -272,6 +278,7 @@ export class MagicHourClient {
             { status: response.status }
           )
         );
+      }
       return new Uint8Array(await response.arrayBuffer());
     });
   }
@@ -304,6 +311,7 @@ export class MagicHourClient {
         signal: deadline,
         credentials: "omit",
       });
+      discardBody(response);
       if (!response.ok)
         throw new Error(
           this.formatMessage(
