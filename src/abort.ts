@@ -5,10 +5,13 @@ export type TimeoutSignal = {
   clear: () => void;
 };
 
-const timeoutError = () => new DOMException("The operation timed out.", "TimeoutError");
+function timeoutError(): DOMException {
+  return new DOMException("The operation timed out.", "TimeoutError");
+}
 
-export const abortError = (signal: AbortSignal): unknown =>
-  signal.reason ?? new DOMException("The operation was aborted.", "AbortError");
+export function abortError(signal: AbortSignal): unknown {
+  return signal.reason ?? new DOMException("The operation was aborted.", "AbortError");
+}
 
 function isTimeoutReason(reason: unknown): boolean {
   try {
@@ -21,22 +24,20 @@ function isTimeoutReason(reason: unknown): boolean {
 /** Replaces `AbortSignal.timeout` and `AbortSignal.any`, which older browsers lack. */
 export function createTimeoutSignal(timeoutMs: number, parent?: AbortSignal): TimeoutSignal {
   const controller = new AbortController();
-  const abortFromParent = () => {
+  function abortFromParent() {
     clear();
     // Caller abort reasons can hold sensitive values, so only the timeout type is kept.
     controller.abort(isTimeoutReason(parent?.reason) ? timeoutError() : undefined);
-  };
-  const timer = setTimeout(
-    () => {
-      clear();
-      controller.abort(timeoutError());
-    },
-    Math.min(timeoutMs, MAX_TIMER_MS)
-  );
+  }
+  function abortFromTimeout() {
+    clear();
+    controller.abort(timeoutError());
+  }
   function clear() {
     clearTimeout(timer);
     parent?.removeEventListener("abort", abortFromParent);
   }
+  const timer = setTimeout(abortFromTimeout, Math.min(timeoutMs, MAX_TIMER_MS));
   if (parent?.aborted) abortFromParent();
   else parent?.addEventListener("abort", abortFromParent, { once: true });
   return { signal: controller.signal, clear };
@@ -44,7 +45,9 @@ export function createTimeoutSignal(timeoutMs: number, parent?: AbortSignal): Ti
 
 export function abortable<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
   return new Promise<T>((resolve, reject) => {
-    const abort = () => reject(abortError(signal));
+    function abort() {
+      reject(abortError(signal));
+    }
     if (signal.aborted) abort();
     else signal.addEventListener("abort", abort, { once: true });
     promise.then(resolve, reject).then(() => signal.removeEventListener("abort", abort));

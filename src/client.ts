@@ -17,11 +17,14 @@ type PreparedRequest = { url: string; init: RequestInit };
 const API_ORIGIN = "https://api.magichour.ai";
 
 /** A 4xx means the API refused the job, except 408, where the outcome is unknown. */
-const wasRejected = (status?: number) =>
-  status !== undefined && status >= 400 && status < 500 && status !== 408;
+function wasRejected(status?: number): boolean {
+  return status !== undefined && status >= 400 && status < 500 && status !== 408;
+}
 
 /** Releases a response body the client will not read, so it cannot outlive the deadline. */
-const discardBody = (response: Response) => void response.body?.cancel().catch(() => {});
+function discardBody(response: Response): void {
+  void response.body?.cancel().catch(() => {});
+}
 
 export type ClientSettings = {
   apiKey: string;
@@ -208,16 +211,16 @@ export class MagicHourClient {
           if (!["draft", "queued", "rendering"].includes(project.status))
             throw this.projectError(this.formatMessage(messages.unknownProjectStatus), id);
           await new Promise<void>((resolve, reject) => {
-            const done = () => {
+            function done() {
               deadline.removeEventListener("abort", abort);
               resolve();
-            };
-            const timer = setTimeout(done, this.pollIntervalMs);
-            const abort = () => {
+            }
+            function abort() {
               clearTimeout(timer);
               deadline.removeEventListener("abort", abort);
-              reject(new Error(this.formatMessage(messages.waitingStopped)));
-            };
+              reject(abortError(deadline));
+            }
+            const timer = setTimeout(done, this.pollIntervalMs);
             deadline.addEventListener("abort", abort, { once: true });
             if (deadline.aborted) abort();
           });
