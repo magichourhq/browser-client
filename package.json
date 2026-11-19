@@ -9,7 +9,8 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
-    }
+    },
+    "./messages_en.json": "./dist/messages_en.json"
   },
   "files": [
     "dist"
@@ -19,13 +20,15 @@
     "url": "git+https://github.com/magichourhq/browser-client.git"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "tsc -p tsconfig.json && node scripts/build-messages.mjs",
     "prepack": "yarn build"
   },
   "dependencies": {
     "@magichourhq/api-types": "0.1.1"
   },
   "devDependencies": {
+    "@formatjs/cli": "6.16.35",
+    "@formatjs/unplugin": "1.2.14",
     "typescript": "7.0.2"
   },
   "publishConfig": {
