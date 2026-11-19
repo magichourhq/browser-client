@@ -1,8 +1,17 @@
+import type {
+  AiImageGeneratorCreateResponse,
+  FilesUploadUrlsCreateBody,
+  FilesUploadUrlsCreateResponse,
+  ImageToVideoCreateResponse,
+} from "@magichourhq/api-types";
 import { createTimeoutSignal } from "./abort.js";
+import type { CreateBody, CreateEndpoint, CreateKind } from "./endpoints.js";
 import { MagicHourError } from "./errors.js";
 import { englishMessage, type MessageFormatter } from "./messages.js";
 import type { Project, ProjectKind } from "./projects.js";
 import { httpsURL } from "./urls.js";
+
+type CreatedProject = Pick<AiImageGeneratorCreateResponse | ImageToVideoCreateResponse, "id">;
 
 export type ClientSettings = {
   apiKey: string;
@@ -89,16 +98,16 @@ export class MagicHourClient {
       timeout?.clear();
     }
   }
-  async create(
-    endpoint: string,
-    kind: ProjectKind,
-    body: unknown,
+  async create<Endpoint extends CreateEndpoint>(
+    endpoint: Endpoint,
+    kind: CreateKind<Endpoint>,
+    body: CreateBody<Endpoint>,
     signal: AbortSignal,
     headers?: Record<string, string | undefined>
   ): Promise<string> {
-    let created: { id: string };
+    let created: CreatedProject;
     try {
-      created = await this.request<{ id: string }>(`/v1/${endpoint}`, body, signal, headers);
+      created = await this.request<CreatedProject>(`/v1/${endpoint}`, body, signal, headers);
     } catch (error) {
       if (error instanceof MagicHourError) throw error;
       throw new MagicHourError(
@@ -251,9 +260,10 @@ export class MagicHourClient {
           description: "Error shown when a Magic Hour API operation cannot complete.",
         })
       );
-    const { items } = await this.request<{ items: { upload_url: string; file_path: string }[] }>(
+    const uploadRequest: FilesUploadUrlsCreateBody = { items: [{ type: "image", extension }] };
+    const { items } = await this.request<FilesUploadUrlsCreateResponse>(
       "/v1/files/upload-urls",
-      { items: [{ type: "image", extension }] },
+      uploadRequest,
       signal
     );
     const item = items?.[0];
