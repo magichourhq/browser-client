@@ -157,8 +157,8 @@ export class MagicHourClient {
       }
       try {
         return (await abortable(response.json(), deadline)) as T;
-      } catch (error) {
-        if (deadline.aborted) throw error;
+      } catch {
+        if (deadline.aborted) throw abortError(deadline);
         // JSON parser errors can quote the response body.
         throw new MagicHourError(
           this.formatMessage({
