@@ -22,6 +22,8 @@ function wasRejected(status?: number): boolean {
 
 export type ClientSettings = {
   apiKey: string;
+  /** Replaces the global `fetch`, for example to add logging or run in tests. */
+  fetch?: typeof fetch;
   formatMessage?: MessageFormatter;
   pollIntervalMs?: number;
   timeoutMs?: number;
@@ -32,7 +34,10 @@ export class MagicHourClient {
   readonly pollIntervalMs: number;
   readonly timeoutMs: number;
   private readonly formatMessage: MessageFormatter;
+  private readonly fetch: typeof fetch;
   constructor(private readonly settings: ClientSettings) {
+    // Look up the global at call time so it is never called with the wrong `this`.
+    this.fetch = settings.fetch ?? ((input, init) => fetch(input, init));
     const format = settings.formatMessage ?? englishMessage;
     // Pass a copy so a host formatter cannot change the shared message table.
     this.formatMessage = (message, values) => format({ ...message }, values);
@@ -145,7 +150,7 @@ export class MagicHourClient {
   }
   async download(url: string, signal?: AbortSignal): Promise<Uint8Array> {
     return this.withDeadline(signal, async (deadline) => {
-      const response = await fetch(httpsURL(url, this.formatMessage), {
+      const response = await this.fetch(httpsURL(url, this.formatMessage), {
         signal: deadline,
         credentials: "omit",
       });
@@ -168,7 +173,7 @@ export class MagicHourClient {
       const item = uploadUrls?.items?.[0];
       if (!item?.file_path || !item.upload_url)
         throw new Error(this.formatMessage(messages.invalidUploadResponse));
-      const response = await fetch(httpsURL(item.upload_url, this.formatMessage), {
+      const response = await this.fetch(httpsURL(item.upload_url, this.formatMessage), {
         method: "PUT",
         body: bytes as BodyInit,
         signal: deadline,
@@ -204,7 +209,7 @@ export class MagicHourClient {
   }
   private async send<T>({ url, init }: PreparedRequest, signal?: AbortSignal): Promise<T> {
     return this.withDeadline(signal, async (deadline) => {
-      const response = await fetch(url, { ...init, signal: deadline });
+      const response = await this.fetch(url, { ...init, signal: deadline });
       if (!response.ok) {
         // Do not echo a remote response that could contain credentials or signed URLs.
         throw new MagicHourError(
