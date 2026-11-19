@@ -40,7 +40,14 @@ export class MagicHourClient {
     this.fetch = settings.fetch ?? ((input, init) => fetch(input, init));
     const format = settings.formatMessage ?? englishMessage;
     // Pass a copy so a host formatter cannot change the shared message table.
-    this.formatMessage = (message, values) => format({ ...message }, values);
+    this.formatMessage = (message, values) => {
+      try {
+        return format({ ...message }, values);
+      } catch {
+        // A broken translation must not replace an error that carries an accepted project ID.
+        return englishMessage(message, values);
+      }
+    };
     if (!settings.apiKey?.trim()) throw new Error(this.formatMessage(messages.apiKeyRequired));
     this.pollIntervalMs = settings.pollIntervalMs ?? 2000;
     this.timeoutMs = settings.timeoutMs ?? 600_000;
