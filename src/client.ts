@@ -313,7 +313,11 @@ export class MagicHourClient {
           )
         );
       }
-      return new Uint8Array(await abortable(response.arrayBuffer(), deadline));
+      try {
+        return new Uint8Array(await abortable(response.arrayBuffer(), deadline));
+      } catch {
+        throw this.transportError(deadline);
+      }
     });
   }
   async uploadImage(bytes: Uint8Array, extension: string, signal?: AbortSignal): Promise<string> {
@@ -364,13 +368,27 @@ export class MagicHourClient {
     deadline: AbortSignal
   ): Promise<Response> {
     if (deadline.aborted) throw abortError(deadline);
-    const pending = this.fetcher(url, { ...init, signal: deadline });
+    let pending: Promise<Response> | undefined;
     try {
+      pending = this.fetcher(url, { ...init, signal: deadline });
       return await abortable(pending, deadline);
-    } catch (error) {
-      pending.then(discardBody, () => {});
-      throw error;
+    } catch {
+      pending?.then(discardBody, () => {});
+      throw this.transportError(deadline);
     }
+  }
+  /** Fetch wrappers can put URLs and request headers on their errors, so none are forwarded. */
+  private transportError(deadline: AbortSignal): unknown {
+    if (deadline.aborted) return abortError(deadline);
+    return new MagicHourError(
+      this.formatMessage({
+        defaultMessage: "The network request failed.",
+        description: "Error shown when a Magic Hour API operation cannot complete.",
+      }),
+      undefined,
+      undefined,
+      this.formatMessage
+    );
   }
   private async withDeadline<T>(
     signal: AbortSignal | undefined,
