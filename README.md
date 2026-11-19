@@ -2,4 +2,8 @@
 
 Browser client for the [Magic Hour API](https://docs.magichour.ai).
 
-It will be published to npm as `@magichourhq/browser-client`. The package is not available yet.
+It's published to npm as `@magichourhq/browser-client`. Until the first stable release, install the `dev` tag:
+
+```sh
+npm install @magichourhq/browser-client@dev
+```
