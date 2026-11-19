@@ -62,3 +62,13 @@ export type CreateEndpoints = {
 export type CreateEndpoint = keyof CreateEndpoints;
 export type CreateBody<Endpoint extends CreateEndpoint> = CreateEndpoints[Endpoint]["body"];
 export type CreateKind<Endpoint extends CreateEndpoint> = CreateEndpoints[Endpoint]["kind"];
+/** Keeps each endpoint paired with its project kind and request body. */
+export type CreateArguments = {
+  [Endpoint in CreateEndpoint]: [
+    endpoint: Endpoint,
+    kind: CreateKind<Endpoint>,
+    body: CreateBody<Endpoint>,
+    signal?: AbortSignal,
+    headers?: Record<string, string | undefined>,
+  ];
+}[CreateEndpoint];
