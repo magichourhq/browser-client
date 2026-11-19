@@ -1,6 +1,16 @@
 # Magic Hour Browser Client
 
+[![npm](https://img.shields.io/npm/v/@magichourhq/browser-client)](https://www.npmjs.com/package/@magichourhq/browser-client)
+
 Browser client for the [Magic Hour API](https://docs.magichour.ai), published to npm as `@magichourhq/browser-client`.
+
+It's built for Magic Hour integrations that run in a web page, such as the Canva app, where requests go straight from the browser to the API. It covers what those integrations share:
+
+- Upload an image to use as input.
+- Start an image or video generation, with request bodies typed from [`@magichourhq/api-types`](https://github.com/magichourhq/api-types).
+- Wait for the generation to finish, then download the result.
+- Turn API failures into short errors that never include the API key, response bodies, or signed URLs.
+- Give apps that translate their UI a catalog of every error message, with stable IDs.
 
 ```sh
 npm install @magichourhq/browser-client
