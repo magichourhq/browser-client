@@ -1,3 +1,4 @@
+import { createTimeoutSignal } from "./abort.js";
 import { MagicHourError } from "./errors.js";
 import { englishMessage, type MessageFormatter } from "./messages.js";
 import type { Project, ProjectKind } from "./projects.js";
@@ -22,7 +23,7 @@ export class MagicHourClient {
           description: "Error shown when a Magic Hour API operation cannot complete.",
         })
       );
-    this.fetcher = settings.fetch ?? globalThis.fetch.bind(globalThis);
+    this.fetcher = settings.fetch ?? ((input, init) => fetch(input, init));
     this.timeoutMs = settings.timeoutMs ?? 600_000;
     if (!Number.isFinite(this.timeoutMs) || this.timeoutMs <= 0)
       throw new Error(
@@ -33,8 +34,7 @@ export class MagicHourClient {
       );
   }
   signal(signal?: AbortSignal): AbortSignal {
-    const timeout = AbortSignal.timeout(this.timeoutMs);
-    return signal ? AbortSignal.any([signal, timeout]) : timeout;
+    return createTimeoutSignal(this.timeoutMs, signal).signal;
   }
   async request<T>(
     path: string,
@@ -48,29 +48,34 @@ export class MagicHourClient {
     headers.set("Authorization", `Bearer ${this.settings.apiKey.trim()}`);
     headers.set("Accept", "application/json");
     if (body !== undefined) headers.set("Content-Type", "application/json");
-    const response = await this.fetcher(`https://api.magichour.ai${path}`, {
-      method: body === undefined ? "GET" : "POST",
-      headers,
-      ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
-      signal: signal ?? this.signal(),
-      redirect: "error",
-    });
-    if (!response.ok) {
-      // Do not echo a remote response that could contain credentials or signed URLs.
-      throw new MagicHourError(
-        this.formatMessage(
-          {
-            defaultMessage: "Magic Hour API returned HTTP {status}.",
-            description: "Error shown when a Magic Hour API operation cannot complete.",
-          },
-          { status: response.status }
-        ),
-        undefined,
-        response.status,
-        this.formatMessage
-      );
+    const timeout = signal ? undefined : createTimeoutSignal(this.timeoutMs);
+    try {
+      const response = await this.fetcher(`https://api.magichour.ai${path}`, {
+        method: body === undefined ? "GET" : "POST",
+        headers,
+        ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
+        signal: signal ?? timeout?.signal,
+        redirect: "error",
+      });
+      if (!response.ok) {
+        // Do not echo a remote response that could contain credentials or signed URLs.
+        throw new MagicHourError(
+          this.formatMessage(
+            {
+              defaultMessage: "Magic Hour API returned HTTP {status}.",
+              description: "Error shown when a Magic Hour API operation cannot complete.",
+            },
+            { status: response.status }
+          ),
+          undefined,
+          response.status,
+          this.formatMessage
+        );
+      }
+      return (await response.json()) as T;
+    } finally {
+      timeout?.clear();
     }
-    return response.json() as Promise<T>;
   }
   async getProject<Kind extends ProjectKind>(
     id: string,
