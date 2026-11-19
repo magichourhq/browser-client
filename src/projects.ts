@@ -1,12 +1,7 @@
-import type {
-  AudioProjectsGetResponse,
-  ImageProjectsGetResponse,
-  VideoProjectsGetResponse,
-} from "@magichourhq/api-types";
+import type { ImageProjectsGetResponse, VideoProjectsGetResponse } from "@magichourhq/api-types";
 
-export type ProjectKind = "audio" | "image" | "video";
+export type ProjectKind = "image" | "video";
 type ProjectsByKind = {
-  audio: AudioProjectsGetResponse;
   image: ImageProjectsGetResponse;
   video: VideoProjectsGetResponse;
 };
