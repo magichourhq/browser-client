@@ -5,7 +5,7 @@ import type {
   ImageToVideoCreateResponse,
 } from "@magichourhq/api-types";
 import { abortable, abortError, createTimeoutSignal } from "./abort.js";
-import type { CreateArguments } from "./endpoints.js";
+import { createKinds, type CreateArguments } from "./endpoints.js";
 import { MagicHourError } from "./errors.js";
 import { englishMessage, messages, type MessageFormatter } from "./messages.js";
 import type { Project, ProjectKind } from "./projects.js";
@@ -48,7 +48,10 @@ export class MagicHourClient {
   signal(signal?: AbortSignal): AbortSignal {
     return createTimeoutSignal(this.timeoutMs, signal).signal;
   }
-  async create(...[endpoint, kind, body, signal, headers]: CreateArguments): Promise<string> {
+  async create(...[endpoint, body, signal, headers]: CreateArguments): Promise<string> {
+    // Without a known kind, the accepted project could not be resumed.
+    const kind: ProjectKind | undefined = createKinds[endpoint];
+    if (kind !== "image" && kind !== "video") throw this.invalidRequest();
     const request = this.prepareRequest(`/v1/${endpoint}`, body, headers);
     return this.withDeadline(signal, async (deadline) => {
       if (deadline.aborted) throw abortError(deadline);
@@ -196,12 +199,7 @@ export class MagicHourClient {
       return request;
     } catch {
       // Header errors can repeat the value, including the API key.
-      throw new MagicHourError(
-        this.formatMessage(messages.invalidRequest),
-        undefined,
-        undefined,
-        this.formatMessage
-      );
+      throw this.invalidRequest();
     }
   }
   private async send<T>({ url, init }: PreparedRequest, signal?: AbortSignal): Promise<T> {
@@ -240,6 +238,14 @@ export class MagicHourClient {
     } finally {
       deadline.clear();
     }
+  }
+  private invalidRequest(): MagicHourError {
+    return new MagicHourError(
+      this.formatMessage(messages.invalidRequest),
+      undefined,
+      undefined,
+      this.formatMessage
+    );
   }
   private projectError(message: string, id: string): MagicHourError {
     return new MagicHourError(message, id, undefined, this.formatMessage);

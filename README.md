@@ -13,7 +13,7 @@ npm install @magichourhq/browser-client
 import { MagicHourClient } from "@magichourhq/browser-client";
 
 const client = new MagicHourClient({ apiKey });
-const id = await client.create("ai-image-generator", "image", {
+const id = await client.create("ai-image-generator", {
   image_count: 1,
   style: { prompt: "A red apple on a white table" },
 });
