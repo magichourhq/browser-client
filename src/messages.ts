@@ -14,18 +14,6 @@ export function englishMessage(
     String(values[key] ?? placeholder)
   );
 }
-/** Keeps error handling working when a host's translation function throws. */
-export function withEnglishFallback(
-  formatMessage: MessageFormatter = englishMessage
-): MessageFormatter {
-  return function formatWithFallback(message, values) {
-    try {
-      return formatMessage(message, values);
-    } catch {
-      return englishMessage(message, values);
-    }
-  };
-}
 
 /** IDs are stable so translations in host apps keep matching. */
 export const messages = {
@@ -118,11 +106,6 @@ export const messages = {
   uploadHttpError: {
     id: "AFvxOh",
     defaultMessage: "Image upload returned HTTP {status}.",
-    description: API_ERROR,
-  },
-  networkRequestFailed: {
-    id: "PbCbzT",
-    defaultMessage: "The network request failed.",
     description: API_ERROR,
   },
   waitingStopped: {
