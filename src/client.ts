@@ -72,13 +72,13 @@ export class MagicHourClient {
     }
     return response.json() as Promise<T>;
   }
-  async getProject(
+  async getProject<Kind extends ProjectKind>(
     id: string,
-    kind: ProjectKind,
+    kind: Kind,
     signal?: AbortSignal,
     headers?: Record<string, string | undefined>
-  ): Promise<Project> {
-    return this.request<Project>(
+  ): Promise<Project<Kind>> {
+    return this.request<Project<Kind>>(
       `/v1/${kind}-projects/${encodeURIComponent(id)}`,
       undefined,
       signal,

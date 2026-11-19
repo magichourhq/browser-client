@@ -1,8 +1,8 @@
+import type { ImageProjectsGetResponse, VideoProjectsGetResponse } from "@magichourhq/api-types";
+
 export type ProjectKind = "image" | "video";
-export type Project = {
-  id: string;
-  status: "draft" | "queued" | "rendering" | "complete" | "error" | "canceled";
-  credits_charged: number;
-  downloads: { url: string; expires_at: string }[];
-  error?: { message: string; code: string } | null;
+type ProjectsByKind = {
+  image: ImageProjectsGetResponse;
+  video: VideoProjectsGetResponse;
 };
+export type Project<Kind extends ProjectKind = ProjectKind> = ProjectsByKind[Kind];

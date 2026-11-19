@@ -5,10 +5,18 @@ __metadata:
   version: 10
   cacheKey: 10
 
+"@magichourhq/api-types@npm:0.0.0-dev.3":
+  version: 0.0.0-dev.3
+  resolution: "@magichourhq/api-types@npm:0.0.0-dev.3"
+  checksum: 10/87122973d0a90155ef472ac52b6c86528e41d801afbd6904c6776dd19a7e6f8f353cd4fb21192de1ebd3d8e80a9a59b10c24b7ba5fdf4b75a01cf05119759421
+  languageName: node
+  linkType: hard
+
 "@magichourhq/browser-client@workspace:.":
   version: 0.0.0-use.local
   resolution: "@magichourhq/browser-client@workspace:."
   dependencies:
+    "@magichourhq/api-types": "npm:0.0.0-dev.3"
     typescript: "npm:7.0.2"
   languageName: unknown
   linkType: soft
