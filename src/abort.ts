@@ -26,6 +26,8 @@ export function createTimeoutSignal(timeoutMs: number, parent?: AbortSignal): Ti
     parent?.removeEventListener("abort", abortFromParent);
   }
   const timer = setTimeout(abortFromTimeout, Math.min(timeoutMs, MAX_TIMER_MS));
+  // Like AbortSignal.timeout, the deadline alone must not keep a Node process running.
+  (timer as { unref?: () => void }).unref?.();
   if (parent?.aborted) abortFromParent();
   else parent?.addEventListener("abort", abortFromParent, { once: true });
   return { signal: controller.signal, clear };
