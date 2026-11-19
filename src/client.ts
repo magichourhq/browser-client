@@ -7,7 +7,7 @@ import type {
 import { abortable, abortError, createTimeoutSignal } from "./abort.js";
 import type { CreateArguments } from "./endpoints.js";
 import { MagicHourError } from "./errors.js";
-import { englishMessage, type MessageFormatter } from "./messages.js";
+import { englishMessage, messages, type MessageFormatter } from "./messages.js";
 import type { Project, ProjectKind } from "./projects.js";
 import { httpsURL } from "./urls.js";
 
@@ -33,30 +33,16 @@ export class MagicHourClient {
   readonly timeoutMs: number;
   private readonly formatMessage: MessageFormatter;
   constructor(private readonly settings: ClientSettings) {
-    this.formatMessage = settings.formatMessage ?? englishMessage;
-    if (!settings.apiKey?.trim())
-      throw new Error(
-        this.formatMessage({
-          defaultMessage: "Magic Hour API key is required.",
-          description: "Error shown when a Magic Hour API operation cannot complete.",
-        })
-      );
+    const format = settings.formatMessage ?? englishMessage;
+    // Pass a copy so a host formatter cannot change the shared message table.
+    this.formatMessage = (message, values) => format({ ...message }, values);
+    if (!settings.apiKey?.trim()) throw new Error(this.formatMessage(messages.apiKeyRequired));
     this.pollIntervalMs = settings.pollIntervalMs ?? 2000;
     this.timeoutMs = settings.timeoutMs ?? 600_000;
     if (!Number.isFinite(this.pollIntervalMs) || this.pollIntervalMs < 0)
-      throw new Error(
-        this.formatMessage({
-          defaultMessage: "Invalid poll interval.",
-          description: "Error shown when a Magic Hour API operation cannot complete.",
-        })
-      );
+      throw new Error(this.formatMessage(messages.invalidPollInterval));
     if (!Number.isFinite(this.timeoutMs) || this.timeoutMs <= 0)
-      throw new Error(
-        this.formatMessage({
-          defaultMessage: "Invalid timeout.",
-          description: "Error shown when a Magic Hour API operation cannot complete.",
-        })
-      );
+      throw new Error(this.formatMessage(messages.invalidTimeout));
   }
   /** Shares one deadline across several calls. Its timer runs until it fires or `signal` aborts. */
   signal(signal?: AbortSignal): AbortSignal {
@@ -73,11 +59,7 @@ export class MagicHourClient {
         const status = error instanceof MagicHourError ? error.status : undefined;
         if (wasRejected(status)) throw error;
         throw new MagicHourError(
-          this.formatMessage({
-            defaultMessage:
-              "Generation submission was interrupted. Acceptance is unknown; check account history before submitting again.",
-            description: "Error shown when a Magic Hour API operation cannot complete.",
-          }),
+          this.formatMessage(messages.submissionInterrupted),
           undefined,
           status,
           this.formatMessage
@@ -86,10 +68,7 @@ export class MagicHourClient {
       const id = created?.id;
       if (typeof id !== "string" || !id)
         throw new MagicHourError(
-          this.formatMessage({
-            defaultMessage: "Missing project ID. Check account history before submitting again.",
-            description: "Error shown when a Magic Hour API operation cannot complete.",
-          }),
+          this.formatMessage(messages.missingProjectId),
           undefined,
           undefined,
           this.formatMessage
@@ -100,13 +79,7 @@ export class MagicHourClient {
           deadline
         );
       } catch {
-        throw this.projectError(
-          this.formatMessage({
-            defaultMessage: "Could not save the accepted project ID.",
-            description: "Error shown when a Magic Hour API operation cannot complete.",
-          }),
-          id
-        );
+        throw this.projectError(this.formatMessage(messages.projectIdNotSaved), id);
       }
       return id;
     });
@@ -129,17 +102,12 @@ export class MagicHourClient {
     return this.withDeadline(signal, async (deadline) => {
       try {
         while (true) {
-          if (deadline.aborted) throw this.projectError(this.waitingStoppedMessage(), id);
+          if (deadline.aborted)
+            throw this.projectError(this.formatMessage(messages.waitingStopped), id);
           const project = await this.getProject(id, kind, deadline, headers);
           if (project.status === "complete") {
             if (!project.downloads?.length)
-              throw this.projectError(
-                this.formatMessage({
-                  defaultMessage: "Completed project has no downloadable output.",
-                  description: "Error shown when a Magic Hour API operation cannot complete.",
-                }),
-                id
-              );
+              throw this.projectError(this.formatMessage(messages.noDownloadableOutput), id);
             try {
               for (const download of project.downloads) httpsURL(download.url, this.formatMessage);
             } catch (error) {
@@ -150,24 +118,12 @@ export class MagicHourClient {
           if (project.status === "error" || project.status === "canceled")
             throw this.projectError(
               project.status === "error"
-                ? this.formatMessage({
-                    defaultMessage: "Generation error.",
-                    description: "The generation failed on the server.",
-                  })
-                : this.formatMessage({
-                    defaultMessage: "Generation canceled.",
-                    description: "The generation was canceled on the server.",
-                  }),
+                ? this.formatMessage(messages.generationError)
+                : this.formatMessage(messages.generationCanceled),
               id
             );
           if (!["draft", "queued", "rendering"].includes(project.status))
-            throw this.projectError(
-              this.formatMessage({
-                defaultMessage: "Unknown project status.",
-                description: "Error shown when a Magic Hour API operation cannot complete.",
-              }),
-              id
-            );
+            throw this.projectError(this.formatMessage(messages.unknownProjectStatus), id);
           await abortable(
             new Promise((resolve) => setTimeout(resolve, this.pollIntervalMs)),
             deadline
@@ -177,11 +133,8 @@ export class MagicHourClient {
         if (error instanceof MagicHourError && error.projectId) throw error;
         throw this.projectError(
           deadline.aborted
-            ? this.waitingStoppedMessage()
-            : this.formatMessage({
-                defaultMessage: "Could not retrieve the project.",
-                description: "Error shown when a Magic Hour API operation cannot complete.",
-              }),
+            ? this.formatMessage(messages.waitingStopped)
+            : this.formatMessage(messages.projectNotRetrieved),
           id
         );
       }
@@ -195,25 +148,14 @@ export class MagicHourClient {
       });
       if (!response.ok)
         throw new Error(
-          this.formatMessage(
-            {
-              defaultMessage: "Media download returned HTTP {status}.",
-              description: "Error shown when a Magic Hour API operation cannot complete.",
-            },
-            { status: response.status }
-          )
+          this.formatMessage(messages.downloadHttpError, { status: response.status })
         );
       return new Uint8Array(await response.arrayBuffer());
     });
   }
   async uploadImage(bytes: Uint8Array, extension: string, signal?: AbortSignal): Promise<string> {
     if (!["png", "jpg", "jpeg", "webp"].includes(extension) || !bytes.length)
-      throw new Error(
-        this.formatMessage({
-          defaultMessage: "Expected a nonempty PNG, JPEG, or WebP image.",
-          description: "Error shown when a Magic Hour API operation cannot complete.",
-        })
-      );
+      throw new Error(this.formatMessage(messages.invalidImage));
     return this.withDeadline(signal, async (deadline) => {
       const uploadRequest: FilesUploadUrlsCreateBody = { items: [{ type: "image", extension }] };
       const uploadUrls = await this.send<FilesUploadUrlsCreateResponse | null>(
@@ -222,12 +164,7 @@ export class MagicHourClient {
       );
       const item = uploadUrls?.items?.[0];
       if (!item?.file_path || !item.upload_url)
-        throw new Error(
-          this.formatMessage({
-            defaultMessage: "Invalid upload response.",
-            description: "Error shown when a Magic Hour API operation cannot complete.",
-          })
-        );
+        throw new Error(this.formatMessage(messages.invalidUploadResponse));
       const response = await fetch(httpsURL(item.upload_url, this.formatMessage), {
         method: "PUT",
         body: bytes as BodyInit,
@@ -235,15 +172,7 @@ export class MagicHourClient {
         credentials: "omit",
       });
       if (!response.ok)
-        throw new Error(
-          this.formatMessage(
-            {
-              defaultMessage: "Image upload returned HTTP {status}.",
-              description: "Error shown when a Magic Hour API operation cannot complete.",
-            },
-            { status: response.status }
-          )
-        );
+        throw new Error(this.formatMessage(messages.uploadHttpError, { status: response.status }));
       return item.file_path;
     });
   }
@@ -268,10 +197,7 @@ export class MagicHourClient {
     } catch {
       // Header errors can repeat the value, including the API key.
       throw new MagicHourError(
-        this.formatMessage({
-          defaultMessage: "The Magic Hour request is invalid and was not sent.",
-          description: "Error shown when a Magic Hour API operation cannot complete.",
-        }),
+        this.formatMessage(messages.invalidRequest),
         undefined,
         undefined,
         this.formatMessage
@@ -284,13 +210,7 @@ export class MagicHourClient {
       if (!response.ok) {
         // Do not echo a remote response that could contain credentials or signed URLs.
         throw new MagicHourError(
-          this.formatMessage(
-            {
-              defaultMessage: "Magic Hour API returned HTTP {status}.",
-              description: "Error shown when a Magic Hour API operation cannot complete.",
-            },
-            { status: response.status }
-          ),
+          this.formatMessage(messages.apiHttpError, { status: response.status }),
           undefined,
           response.status,
           this.formatMessage
@@ -302,10 +222,7 @@ export class MagicHourClient {
         if (deadline.aborted) throw abortError(deadline);
         // JSON parser errors can quote the response body.
         throw new MagicHourError(
-          this.formatMessage({
-            defaultMessage: "Magic Hour API returned an invalid response.",
-            description: "Error shown when a Magic Hour API operation cannot complete.",
-          }),
+          this.formatMessage(messages.invalidApiResponse),
           undefined,
           response.status,
           this.formatMessage
@@ -326,11 +243,5 @@ export class MagicHourClient {
   }
   private projectError(message: string, id: string): MagicHourError {
     return new MagicHourError(message, id, undefined, this.formatMessage);
-  }
-  private waitingStoppedMessage(): string {
-    return this.formatMessage({
-      defaultMessage: "Waiting stopped.",
-      description: "Error shown when a Magic Hour API operation cannot complete.",
-    });
   }
 }
