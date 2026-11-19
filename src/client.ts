@@ -106,7 +106,8 @@ export class MagicHourClient {
   ): PreparedRequest {
     try {
       const url = new URL(path, API_ORIGIN);
-      if (url.origin !== API_ORIGIN) throw new Error("Unexpected API origin.");
+      if (url.protocol !== "https:" || url.origin !== API_ORIGIN || url.username || url.password)
+        throw new Error("Unexpected API URL.");
       const headers = new Headers();
       for (const [key, value] of Object.entries(extraHeaders ?? {}))
         if (value !== undefined) headers.set(key, value);
