@@ -43,3 +43,19 @@ export function abortable<T>(promise: Promise<T>, signal: AbortSignal): Promise<
     promise.then(resolve, reject).then(() => signal.removeEventListener("abort", abort));
   });
 }
+
+/** Waits `ms`, or rejects as soon as `signal` aborts. Clears its timer either way. */
+export function sleep(ms: number, signal: AbortSignal): Promise<void> {
+  return new Promise<void>((resolve, reject) => {
+    function abort() {
+      clearTimeout(timer);
+      reject(abortError(signal));
+    }
+    const timer = setTimeout(() => {
+      signal.removeEventListener("abort", abort);
+      resolve();
+    }, ms);
+    if (signal.aborted) abort();
+    else signal.addEventListener("abort", abort, { once: true });
+  });
+}

@@ -4,7 +4,7 @@ import type {
   FilesUploadUrlsCreateResponse,
   ImageToVideoCreateResponse,
 } from "@magichourhq/api-types";
-import { abortable, abortError, createTimeoutSignal } from "./abort.js";
+import { abortable, abortError, createTimeoutSignal, sleep } from "./abort.js";
 import { createKinds, type CreateArguments } from "./endpoints.js";
 import { MagicHourError } from "./errors.js";
 import {
@@ -86,7 +86,8 @@ export class MagicHourClient {
         );
       }
       const id = created?.id;
-      if (typeof id !== "string" || !id)
+      // A blank ID can't be polled or resumed, so treat it like a missing one.
+      if (typeof id !== "string" || !id.trim())
         throw new MagicHourError(
           this.formatMessage(messages.missingProjectId),
           undefined,
@@ -144,10 +145,8 @@ export class MagicHourClient {
             );
           if (!["draft", "queued", "rendering"].includes(project.status))
             throw this.projectError(this.formatMessage(messages.unknownProjectStatus), id);
-          await abortable(
-            new Promise((resolve) => setTimeout(resolve, this.pollIntervalMs)),
-            deadline
-          );
+          // Clears its timer on abort, so a cancelled wait doesn't keep the process running.
+          await sleep(this.pollIntervalMs, deadline);
         }
       } catch (error) {
         if (error instanceof MagicHourError && error.projectId) throw error;
