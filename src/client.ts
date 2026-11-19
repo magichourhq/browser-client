@@ -7,7 +7,12 @@ import type {
 import { abortable, abortError, createTimeoutSignal } from "./abort.js";
 import { createKinds, type CreateArguments } from "./endpoints.js";
 import { MagicHourError } from "./errors.js";
-import { englishMessage, messages, type MessageFormatter } from "./messages.js";
+import {
+  englishMessage,
+  messages,
+  type MessageDescriptor,
+  type MessageFormatter,
+} from "./messages.js";
 import type { Project, ProjectKind } from "./projects.js";
 import { httpsURL } from "./urls.js";
 
@@ -157,15 +162,25 @@ export class MagicHourClient {
   }
   async download(url: string, signal?: AbortSignal): Promise<Uint8Array> {
     return this.withDeadline(signal, async (deadline) => {
-      const response = await this.fetch(httpsURL(url, this.formatMessage), {
-        signal: deadline,
-        credentials: "omit",
-      });
+      const response = await this.fetchSafely(
+        httpsURL(url, this.formatMessage),
+        { signal: deadline, credentials: "omit" },
+        deadline,
+        messages.downloadFailed
+      );
       if (!response.ok)
         throw new Error(
           this.formatMessage(messages.downloadHttpError, { status: response.status })
         );
-      return new Uint8Array(await response.arrayBuffer());
+      let bytes: Uint8Array;
+      try {
+        bytes = new Uint8Array(await response.arrayBuffer());
+      } catch {
+        if (deadline.aborted) throw abortError(deadline);
+        throw new Error(this.formatMessage(messages.downloadFailed));
+      }
+      if (!bytes.length) throw new Error(this.formatMessage(messages.emptyDownload));
+      return bytes;
     });
   }
   async uploadImage(bytes: Uint8Array, extension: string, signal?: AbortSignal): Promise<string> {
@@ -178,14 +193,19 @@ export class MagicHourClient {
         deadline
       );
       const item = uploadUrls?.items?.[0];
-      if (!item?.file_path || !item.upload_url)
+      // The file path goes into a paid request, so reject anything unusable before uploading.
+      if (
+        typeof item?.file_path !== "string" ||
+        !item.file_path.trim() ||
+        typeof item.upload_url !== "string"
+      )
         throw new Error(this.formatMessage(messages.invalidUploadResponse));
-      const response = await this.fetch(httpsURL(item.upload_url, this.formatMessage), {
-        method: "PUT",
-        body: bytes as BodyInit,
-        signal: deadline,
-        credentials: "omit",
-      });
+      const response = await this.fetchSafely(
+        httpsURL(item.upload_url, this.formatMessage),
+        { method: "PUT", body: bytes as BodyInit, signal: deadline, credentials: "omit" },
+        deadline,
+        messages.uploadFailed
+      );
       if (!response.ok)
         throw new Error(this.formatMessage(messages.uploadHttpError, { status: response.status }));
       return item.file_path;
@@ -216,7 +236,12 @@ export class MagicHourClient {
   }
   private async send<T>({ url, init }: PreparedRequest, signal?: AbortSignal): Promise<T> {
     return this.withDeadline(signal, async (deadline) => {
-      const response = await this.fetch(url, { ...init, signal: deadline });
+      const response = await this.fetchSafely(
+        url,
+        { ...init, signal: deadline },
+        deadline,
+        messages.networkError
+      );
       if (!response.ok) {
         // Do not echo a remote response that could contain credentials or signed URLs.
         throw new MagicHourError(
@@ -239,6 +264,25 @@ export class MagicHourClient {
         );
       }
     });
+  }
+  /** Calls fetch, replacing its errors, which can repeat request details, with a fixed message. */
+  private async fetchSafely(
+    url: string,
+    init: RequestInit,
+    deadline: AbortSignal,
+    failure: MessageDescriptor
+  ): Promise<Response> {
+    try {
+      return await this.fetch(url, init);
+    } catch {
+      if (deadline.aborted) throw abortError(deadline);
+      throw new MagicHourError(
+        this.formatMessage(failure),
+        undefined,
+        undefined,
+        this.formatMessage
+      );
+    }
   }
   private async withDeadline<T>(
     signal: AbortSignal | undefined,

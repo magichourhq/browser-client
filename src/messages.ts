@@ -98,6 +98,26 @@ export const messages = {
     defaultMessage: "Expected a nonempty PNG, JPEG, or WebP image.",
     description: API_ERROR,
   },
+  networkError: {
+    id: "Sl4EUs",
+    defaultMessage: "Could not reach the Magic Hour API.",
+    description: API_ERROR,
+  },
+  uploadFailed: {
+    id: "cFJIcl",
+    defaultMessage: "Image upload failed.",
+    description: API_ERROR,
+  },
+  downloadFailed: {
+    id: "9KZP3c",
+    defaultMessage: "Media download failed.",
+    description: API_ERROR,
+  },
+  emptyDownload: {
+    id: "QbVANu",
+    defaultMessage: "Media download returned no data.",
+    description: API_ERROR,
+  },
   invalidUploadResponse: {
     id: "nrNacv",
     defaultMessage: "Invalid upload response.",
