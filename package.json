@@ -20,13 +20,20 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "check": "tsc --noEmit -p tsconfig.test.json",
     "prepack": "yarn build"
   },
   "dependencies": {
     "@magichourhq/api-types": "0.1.1"
   },
   "devDependencies": {
-    "typescript": "7.0.2"
+    "@types/node": "^24.0.0",
+    "@vitest/coverage-v8": "^5.1.0",
+    "tsx": "^4.20.0",
+    "typescript": "7.0.2",
+    "vite": "^8.3.8",
+    "vitest": "^5.1.0"
   },
   "publishConfig": {
     "access": "public"
