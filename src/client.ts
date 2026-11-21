@@ -21,6 +21,32 @@ type PreparedRequest = { url: string; init: RequestInit };
 type RequestHeaders = Record<string, string | undefined>;
 
 /** A 4xx means the API refused the job, except 408, where the outcome is unknown. */
+/**
+ * Reads the API's documented `{ code, message }` error body. The message is cut short and any
+ * URL in it, and the API key if it appears, is replaced, so neither can reach the caller.
+ * Anything else in the body is dropped.
+ */
+async function apiError(
+  response: Response,
+  apiKey: string
+): Promise<{ code?: string; detail?: string }> {
+  let body: { code?: unknown; message?: unknown } = {};
+  try {
+    body = Object(JSON.parse(await response.text()));
+  } catch {
+    // Not the documented JSON, so nothing is passed on.
+  }
+  const code =
+    typeof body.code === "string" && /^[a-z0-9_]{1,64}$/.test(body.code) ? body.code : undefined;
+  const detail = (typeof body.message === "string" ? body.message : "")
+    .split(apiKey)
+    .join("<key>")
+    .replace(/[a-z][a-z0-9+.-]*:\/\/\S*/gi, "<url>")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 300);
+  return { code, detail: detail || undefined };
+}
 function wasRejected(status?: number): boolean {
   return status !== undefined && status >= 400 && status < 500 && status !== 408;
 }
@@ -244,12 +270,14 @@ export class MagicHourClient {
         messages.networkError
       );
       if (!response.ok) {
-        // Do not echo a remote response that could contain credentials or signed URLs.
+        const { code, detail } = await apiError(response, this.settings.apiKey.trim());
+        const status = this.formatMessage(messages.apiHttpError, { status: response.status });
         throw new MagicHourError(
-          this.formatMessage(messages.apiHttpError, { status: response.status }),
+          detail ? `${status} ${code ? `${code}: ` : ""}${detail}` : status,
           undefined,
           response.status,
-          this.formatMessage
+          this.formatMessage,
+          code
         );
       }
       try {

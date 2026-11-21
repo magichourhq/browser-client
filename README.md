@@ -9,7 +9,7 @@ It's built for Magic Hour integrations that run in a web page, such as the Canva
 - Upload an image to use as input.
 - Start an image or video generation, with request bodies typed from [`@magichourhq/api-types`](https://github.com/magichourhq/api-types).
 - Wait for the generation to finish, then download the result.
-- Turn API failures into short errors that never include the API key, response bodies, or signed URLs.
+- Turn API failures into short errors with the API's error `code` and message. Errors never include the API key or signed URLs; any URL in an API message is replaced with `<url>`.
 - Give apps that translate their UI a catalog of every error message, with stable IDs.
 
 ```sh
