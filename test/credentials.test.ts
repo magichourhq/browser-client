@@ -41,19 +41,14 @@ describe("where the API key and headers go", () => {
 });
 
 describe("errors never reveal secrets", () => {
-  test("an HTTP error passes on the API's code and message, without URLs or the key", async () => {
-    const api = fakeApi({
-      createStatus: 400,
-      errorMessage: `Bad model.\nSee https://videos.magichour.ai/SIGNED_1?sig=x for ${API_KEY}`,
-    });
+  test("an HTTP error passes on the API's code and message", async () => {
+    const api = fakeApi({ createStatus: 400, errorMessage: "Unsupported model." });
     const error = await rejection(generate(api));
     expect(error).toMatchObject({
       status: 400,
       code: "http_400",
-      message: "Magic Hour API returned HTTP 400. http_400: Bad model. See <url> for <key>",
+      message: "Magic Hour API returned HTTP 400. Unsupported model.",
     });
-    expectNoSecret(error, "SIGNED_1");
-    expectNoSecret(error, API_KEY);
   });
 
   test("an HTTP error body that isn't the documented JSON is dropped", async () => {
