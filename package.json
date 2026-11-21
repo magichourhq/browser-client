@@ -1,6 +1,6 @@
 {
   "name": "@magichourhq/browser-client",
-  "version": "0.3.3",
+  "version": "0.3.4",
   "description": "Browser client for the Magic Hour API",
   "type": "module",
   "license": "MIT",

@@ -20,6 +20,15 @@ type CreatedProject = Pick<AiImageGeneratorCreateResponse | ImageToVideoCreateRe
 type PreparedRequest = { url: string; init: RequestInit };
 type RequestHeaders = Record<string, string | undefined>;
 
+/** Reads the API's documented `{ code, message }` error body. Anything else is dropped. */
+async function apiError(response: Response): Promise<{ code?: string; message?: string }> {
+  try {
+    const { code, message } = Object(JSON.parse(await response.text()));
+    return { code, message };
+  } catch {
+    return {};
+  }
+}
 /** A 4xx means the API refused the job, except 408, where the outcome is unknown. */
 function wasRejected(status?: number): boolean {
   return status !== undefined && status >= 400 && status < 500 && status !== 408;
@@ -244,12 +253,14 @@ export class MagicHourClient {
         messages.networkError
       );
       if (!response.ok) {
-        // Do not echo a remote response that could contain credentials or signed URLs.
+        const { code, message } = await apiError(response);
+        const status = this.formatMessage(messages.apiHttpError, { status: response.status });
         throw new MagicHourError(
-          this.formatMessage(messages.apiHttpError, { status: response.status }),
+          message ? `${status} ${message}` : status,
           undefined,
           response.status,
-          this.formatMessage
+          this.formatMessage,
+          code
         );
       }
       try {

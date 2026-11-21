@@ -41,9 +41,22 @@ describe("where the API key and headers go", () => {
 });
 
 describe("errors never reveal secrets", () => {
-  test("an HTTP error doesn't echo the response body", async () => {
-    const api = fakeApi({ createStatus: 400, errorMessage: "BODY_SECRET" });
-    expectNoSecret(await rejection(generate(api)), "BODY_SECRET");
+  test("an HTTP error passes on the API's code and message", async () => {
+    const api = fakeApi({ createStatus: 400, errorMessage: "Unsupported model." });
+    const error = await rejection(generate(api));
+    expect(error).toMatchObject({
+      status: 400,
+      code: "http_400",
+      message: "Magic Hour API returned HTTP 400. Unsupported model.",
+    });
+  });
+
+  test("an HTTP error body that isn't the documented JSON is dropped", async () => {
+    const api = fakeApi();
+    const fetch = async () => new Response("BODY_SECRET", { status: 500 });
+    const error = await rejection(api.client({ fetch }).uploadImage(png, "png"));
+    expect(error).toMatchObject({ message: "Magic Hour API returned HTTP 500.", code: undefined });
+    expectNoSecret(error, "BODY_SECRET");
   });
 
   // V8's JSON parse error quotes the first 10 characters of the text.

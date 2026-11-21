@@ -6,7 +6,9 @@ export class MagicHourError extends Error {
     message: string,
     readonly projectId?: string,
     readonly status?: number,
-    formatMessage: MessageFormatter = englishMessage
+    formatMessage: MessageFormatter = englishMessage,
+    /** The API's machine-readable error code, such as `invalid_request` or `insufficient_credits`. */
+    readonly code?: string
   ) {
     super(
       projectId ? formatMessage({ ...messages.projectRecovery }, { message, projectId }) : message
