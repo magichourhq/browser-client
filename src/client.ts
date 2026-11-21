@@ -254,9 +254,9 @@ export class MagicHourClient {
       );
       if (!response.ok) {
         const { code, message } = await apiError(response);
-        const status = this.formatMessage(messages.apiHttpError, { status: response.status });
         throw new MagicHourError(
-          message ? `${status} ${message}` : status,
+          // The status is on the error, so the API's own message is enough when it has one.
+          message || this.formatMessage(messages.apiHttpError, { status: response.status }),
           undefined,
           response.status,
           this.formatMessage,
