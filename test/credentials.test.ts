@@ -47,7 +47,7 @@ describe("errors never reveal secrets", () => {
     expect(error).toMatchObject({
       status: 400,
       code: "http_400",
-      message: "Magic Hour API returned HTTP 400. Unsupported model.",
+      message: "Unsupported model.",
     });
   });
 
