@@ -1,5 +1,6 @@
 import type {
   AiImageGeneratorCreateResponse,
+  AiImageGeneratorCreateResponse402,
   FilesUploadUrlsCreateBody,
   FilesUploadUrlsCreateResponse,
   ImageToVideoCreateResponse,
@@ -20,11 +21,11 @@ type CreatedProject = Pick<AiImageGeneratorCreateResponse | ImageToVideoCreateRe
 type PreparedRequest = { url: string; init: RequestInit };
 type RequestHeaders = Record<string, string | undefined>;
 
-/** Reads the API's documented `{ code, message }` error body. Anything else is dropped. */
-async function apiError(response: Response): Promise<{ code?: string; message?: string }> {
+/** Reads the API's documented error fields. Anything else is dropped. */
+async function apiError(response: Response): Promise<Partial<AiImageGeneratorCreateResponse402>> {
   try {
-    const { code, message } = Object(JSON.parse(await response.text()));
-    return { code, message };
+    const { code, message, credit_shortfall } = Object(JSON.parse(await response.text()));
+    return { code, message, credit_shortfall };
   } catch {
     return {};
   }
@@ -253,14 +254,15 @@ export class MagicHourClient {
         messages.networkError
       );
       if (!response.ok) {
-        const { code, message } = await apiError(response);
+        const { code, message, credit_shortfall } = await apiError(response);
         throw new MagicHourError(
           // The status is on the error, so the API's own message is enough when it has one.
           message || this.formatMessage(messages.apiHttpError, { status: response.status }),
           undefined,
           response.status,
           this.formatMessage,
-          code
+          code,
+          credit_shortfall
         );
       }
       try {
