@@ -1,9 +1,9 @@
 import type {
   AiImageGeneratorCreateResponse,
-  AiImageGeneratorCreateResponse402,
   FilesUploadUrlsCreateBody,
   FilesUploadUrlsCreateResponse,
   ImageToVideoCreateResponse,
+  ImageToVideoCreateResponse402,
 } from "@magichourhq/api-types";
 import { abortable, abortError, createTimeoutSignal, sleep } from "./abort.js";
 import { createKinds, type CreateArguments } from "./endpoints.js";
@@ -22,10 +22,11 @@ type PreparedRequest = { url: string; init: RequestInit };
 type RequestHeaders = Record<string, string | undefined>;
 
 /** Reads the API's documented error fields. Anything else is dropped. */
-async function apiError(response: Response): Promise<Partial<AiImageGeneratorCreateResponse402>> {
+async function apiError(response: Response): Promise<Partial<ImageToVideoCreateResponse402>> {
   try {
-    const { code, message, credit_shortfall } = Object(JSON.parse(await response.text()));
-    return { code, message, credit_shortfall };
+    const { code, message, credit_shortfall, credits_available, credits_required, next_action } =
+      Object(JSON.parse(await response.text()));
+    return { code, message, credit_shortfall, credits_available, credits_required, next_action };
   } catch {
     return {};
   }
@@ -254,7 +255,8 @@ export class MagicHourClient {
         messages.networkError
       );
       if (!response.ok) {
-        const { code, message, credit_shortfall } = await apiError(response);
+        const { code, message, credit_shortfall, credits_available, credits_required, next_action } =
+          await apiError(response);
         throw new MagicHourError(
           // The status is on the error, so the API's own message is enough when it has one.
           message || this.formatMessage(messages.apiHttpError, { status: response.status }),
@@ -262,7 +264,12 @@ export class MagicHourClient {
           response.status,
           this.formatMessage,
           code,
-          credit_shortfall
+          credit_shortfall,
+          {
+            creditsAvailable: credits_available,
+            creditsRequired: credits_required,
+            nextAction: next_action && { type: next_action.type, reason: next_action.reason },
+          }
         );
       }
       try {

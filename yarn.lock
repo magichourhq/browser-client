@@ -290,10 +290,10 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@magichourhq/api-types@npm:0.1.5":
-  version: 0.1.5
-  resolution: "@magichourhq/api-types@npm:0.1.5"
-  checksum: 10/0e6428a96d0c94791fb2a5482e779ea2eaddad102ce735cce8e1333ae3d6b994ab386f6ada250042b77ef9144742bf0f7adeaf47e6ef73735d5f2c2d30a26bba
+"@magichourhq/api-types@npm:0.2.0":
+  version: 0.2.0
+  resolution: "@magichourhq/api-types@npm:0.2.0"
+  checksum: 10/203940e63c30bf2608fd0d8c39c8bd648f888906d4f4cf6ce9b042dee5e6ae92e4078041ba101821b117ba8b1d09684bd7ffbebb6f0d54661a330420d1be6dd1
   languageName: node
   linkType: hard
 
@@ -301,7 +301,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@magichourhq/browser-client@workspace:."
   dependencies:
-    "@magichourhq/api-types": "npm:0.1.5"
+    "@magichourhq/api-types": "npm:0.2.0"
     "@types/node": "npm:^24.0.0"
     "@vitest/coverage-v8": "npm:^5.1.0"
     tsx: "npm:^4.20.0"

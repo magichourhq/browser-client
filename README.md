@@ -33,6 +33,6 @@ const bytes = await client.download(project.downloads[0].url);
 
 The client never retries a request that starts a paid generation. If that request fails and the API did not clearly reject it, the error says the generation may have started, so check the account before trying again.
 
-When the API returns `insufficient_credits`, `MagicHourError.creditShortfall` contains the missing credit amount if the response includes it.
+When the API returns `insufficient_credits`, `MagicHourError` exposes `creditShortfall`, `creditsAvailable`, `creditsRequired`, and `nextAction` when the response includes them.
 
 Supported browsers: Chrome 66, Edge 79, Firefox 60, Safari 12.1, iOS Safari 12.2, Samsung Internet 9, Opera 53, and later versions.
